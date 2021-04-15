@@ -1,29 +1,45 @@
 use anyhow::{bail, ensure, Context, Result};
-use clap::{App, Arg};
+use clap::Clap;
 use std::fs::File;
-use std::io::{Read, BufRead};
+use std::io::{stdin, BufRead, BufReader};
 use std::path::PathBuf;
 
 
-fn main() {
-    let matches = App::new("grrs")
-        .version("1.0.0")
-        .author("nakamo326")
-        .about("mini grep clone")
-        .arg(Arg::with_name("patterns")
-            .help("pattern to search")
-            .value_name("PATTERNS")
-            .index(1)
-            .required(true))
-        .arg(Arg::with_name("file")
-            .help("file to read")
-            .value_name("FILE")
-            .index(2)
-            .required(false))
-        .get_matches();
+#[derive(Clap, Debug)]
+#[clap(
+    name = "grrs",
+    version = "1.0.0",
+    author = "nakamo326",
+    about = "mini grep clone"
+)]
+struct Cli {
+    /// pattern to search each lines
+    #[clap(name = "PATTERN")]
+    pattern: String,
+    /// target file
+    #[clap(name = "FILE")]
+    path: Option<PathBuf>,
+}
 
-    let pattern: String = matches.values_of("patterns").unwrap().collect();
-    println!("pattern: {:?}", pattern);
+fn main() -> Result<()> {
+    let args = Cli::parse();
+    if let Some(path) = args.path {
+        let f = File::open(path)?;
+        let reader = BufReader::new(f);
+        search(reader, args.pattern)
+    } else {
+        let stdin = stdin();
+        let reader = stdin.lock();
+        search(reader, args.pattern)
+    }
+}
 
-
+fn search<R: BufRead>(reader: R, pattern: String) -> Result<()> {
+    for line in reader.lines() {
+        let line = line?;
+        if line.contains(&pattern) {
+            println!("{}", line);
+        }
+    }
+    Ok(())
 }

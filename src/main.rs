@@ -1,3 +1,5 @@
+extern crate exitcode;
+
 use anyhow::{bail, ensure, Context, Result};
 use clap::Clap;
 use std::fs::File;
@@ -21,25 +23,44 @@ struct Cli {
     path: Option<PathBuf>,
 }
 
-fn main() -> Result<()> {
+fn main() {
     let args = Cli::parse();
+    let result: Result<bool>;
     if let Some(path) = args.path {
-        let f = File::open(path)?;
-        let reader = BufReader::new(f);
-        search(reader, args.pattern)
+        let f = File::open(path);
+        match f {
+            Ok(x) => {
+                let reader = BufReader::new(x);
+                result = search(reader, args.pattern);
+            },
+            Err(e) => {
+                eprintln!("grrs: {}", e);
+                std::process::exit(2)
+            },
+        };
     } else {
         let stdin = stdin();
         let reader = stdin.lock();
-        search(reader, args.pattern)
+        result = search(reader, args.pattern);
     }
+    match result {
+        Ok(true) => std::process::exit(exitcode::OK),
+        Ok(false) => std::process::exit(1),
+        Err(e) => {
+            eprintln!("grrs: {:?}", e);
+            std::process::exit(2)
+        },
+    };
 }
 
-fn search<R: BufRead>(reader: R, pattern: String) -> Result<()> {
+fn search<R: BufRead>(reader: R, pattern: String) -> Result<bool> {
+    let mut has_match = false;
     for line in reader.lines() {
         let line = line?;
         if line.contains(&pattern) {
+            has_match = true;
             println!("{}", line);
         }
     }
-    Ok(())
+    Ok(has_match)
 }
